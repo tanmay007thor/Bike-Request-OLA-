@@ -1,152 +1,99 @@
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-from statsmodels.tsa.statespace.sarimax import SARIMAX # type: ignore
-from statsmodels.tsa.stattools import adfuller # type: ignore
-from statsmodels.graphics.tsaplots import plot_acf, plot_pacf # type: ignore
+import numpy as np
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.metrics import mean_squared_error
 
-import warnings
-warnings.filterwarnings("ignore")
+def visualize_time_series(ts_data):
+    daily_cycle = ts_data.groupby(ts_data.index.hour)['count'].mean()
+    weekly_cycle = ts_data.groupby(ts_data.index.dayofweek)['count'].mean()
+    daily_counts = ts_data['count'].resample('D').sum()
+    rolling_daily = daily_counts.rolling(window=7).mean()
 
+    fig, axs = plt.subplots(3, 1, figsize=(14, 12))
 
-class TimeSeriesAnalysis:
-    def __init__(self, data):
-        self.data = data
-        self.ts_data = None
-        self.daily_counts = None
-        self.train = None
-        self.test = None
-        self.model_results = None
-        
-    def preprocess_data(self):
-        self.data['time'] = pd.to_datetime(self.data[['year', 'month', 'day', 'hour']])
-        self.ts_data = self.data.set_index('time')
-        self.daily_counts = self.ts_data['count'].resample('D').sum().dropna()
-        
-    def plot_cycles(self):
-        daily_cycle = self.ts_data.groupby(self.ts_data.index.hour)['count'].mean()
-        weekly_cycle = self.ts_data.groupby(self.ts_data.index.dayofweek)['count'].mean()
-        weekday_labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-        rolling_daily = self.daily_counts.rolling(window=7).mean()
+    axs[0].plot(daily_cycle.index, daily_cycle.values, marker='o')
+    axs[0].set_title('Daily Cycle')
 
-        fig, axs = plt.subplots(3, 1, figsize=(14, 12), sharex=False)
+    axs[1].plot(weekly_cycle.index, weekly_cycle.values, marker='o')
+    axs[1].set_title('Weekly Cycle')
 
-        axs[0].plot(daily_cycle.index, daily_cycle.values, marker='o', color='blue')
-        axs[0].set_title('Daily Cycle – Average Ride Count by Hour')
-        axs[0].set_xlabel('Hour of Day')
-        axs[0].set_ylabel('Avg Count')
-        axs[0].grid(True)
+    axs[2].plot(daily_counts.index, daily_counts.values, label='Daily')
+    axs[2].plot(rolling_daily.index, rolling_daily.values, label='Rolling', color='red')
+    axs[2].legend()
+    axs[2].set_title('Smoothed Daily Count')
 
-        axs[1].plot(weekly_cycle.index, weekly_cycle.values, marker='o', color='green')
-        axs[1].set_title('Weekly Cycle – Average Ride Count by Day of Week')
-        axs[1].set_xlabel('Day of Week')
-        axs[1].set_ylabel('Avg Count')
-        axs[1].set_xticks(range(7))
-        axs[1].set_xticklabels(weekday_labels)
-        axs[1].grid(True)
+    plt.tight_layout()
+    plt.show()
 
-        axs[2].plot(self.daily_counts.index, self.daily_counts.values, color='lightgray', label='Daily Count')
-        axs[2].plot(rolling_daily.index, rolling_daily.values, color='red', label='7-Day Rolling Mean')
-        axs[2].set_title('Seasonal/Yearly Cycle – Smoothed Daily Ride Count')
-        axs[2].set_xlabel('Date')
-        axs[2].set_ylabel('Total Count')
-        axs[2].legend()
-        axs[2].grid(True)
+def plot_acf_pacf(daily_counts):
+    series_list = [
+        ('Original', daily_counts),
+        ('1st Diff', daily_counts.diff().dropna()),
+        ('7-day Diff', daily_counts.diff(7).dropna()),
+        ('Log + Diff', np.log1p(daily_counts).diff().dropna())
+    ]
 
-        plt.tight_layout()
-        plt.show()
+    fig, axs = plt.subplots(len(series_list), 2, figsize=(14, 10))
+    for i, (title, series) in enumerate(series_list):
+        plot_acf(series, lags=30, ax=axs[i, 0])
+        axs[i, 0].set_title(f'ACF - {title}')
+        plot_pacf(series, lags=30, ax=axs[i, 1])
+        axs[i, 1].set_title(f'PACF - {title}')
+    plt.tight_layout()
+    plt.show()
 
-    def perform_stationarity_check(self):
-        result_orig = adfuller(self.daily_counts.dropna())
-        print('ADF Statistic (Original):', result_orig[0])
-        print('p-value:', result_orig[1])
+def sarimax_analysis(ts_data, daily_counts):
+    exog = ts_data[['temp', 'humidity', 'windspeed', 'weather', 'season']].resample('D').mean().fillna(method='ffill')
+    train, test = daily_counts[:-30], daily_counts[-30:]
+    exog_train, exog_test = exog.loc[train.index], exog.loc[test.index]
 
-        diff_1 = self.daily_counts.diff().dropna()
-        result_diff1 = adfuller(diff_1)
-        print('\nADF Statistic (1st Difference):', result_diff1[0])
-        print('p-value:', result_diff1[1])
+    model = SARIMAX(train, exog=exog_train, order=(1,1,1), seasonal_order=(0,1,1,7), enforce_stationarity=False, enforce_invertibility=False)
+    results = model.fit(disp=False)
 
-        diff_seasonal = self.daily_counts.diff(7).dropna()
-        result_seasonal = adfuller(diff_seasonal)
-        print('\nADF Statistic (7-day Seasonal Difference):', result_seasonal[0])
-        print('p-value:', result_seasonal[1])
+    forecast = results.get_forecast(steps=30, exog=exog_test)
+    forecast_mean = forecast.predicted_mean
+    conf_int = forecast.conf_int()
+    mse = ((test - forecast_mean)**2)
 
-    def split_data(self):
-        self.train = self.daily_counts[:-30]
-        self.test = self.daily_counts[-30:]
+    fig, axs = plt.subplots(3, 1, figsize=(14, 10))
 
-    def fit_sarimax_model(self):
-        model = SARIMAX(
-            self.train,
-            order=(1, 1, 1),
-            seasonal_order=(1, 1, 1, 7),
-            enforce_stationarity=False,
-            enforce_invertibility=False
-        )
-        self.model_results = model.fit(disp=False)
+    axs[0].plot(test.index, test, label='Actual')
+    axs[0].plot(test.index, forecast_mean, label='Forecast', color='red')
+    axs[0].fill_between(test.index, conf_int.iloc[:, 0], conf_int.iloc[:, 1], color='pink', alpha=0.3)
+    axs[0].set_title('SARIMAX Forecast')
+    axs[0].legend()
 
-    def forecast_and_plot(self):
-        forecast = self.model_results.get_forecast(steps=30)
-        forecast_mean = forecast.predicted_mean
-        pred_ci = forecast.conf_int()
+    axs[1].plot(daily_counts.diff().dropna(), color='purple')
+    axs[1].set_title('Differenced Series')
 
-        mse_loss = (self.test - forecast_mean) ** 2
+    axs[2].plot(mse.index, mse, color='orange', marker='o')
+    axs[2].set_title('MSE Loss')
 
-        differenced = self.daily_counts.diff().dropna()
-        residuals = self.model_results.resid
+    plt.tight_layout()
+    plt.show()
 
-        fig, axes = plt.subplots(3, 1, figsize=(14, 10), sharex=False)
+def hybrid_model_analysis(ts_data, daily_counts):
+    train, test = daily_counts[:-30], daily_counts[-30:]
+    sarimax_model = SARIMAX(train, order=(1,1,1), seasonal_order=(1,1,1,7)).fit(disp=False)
+    residuals = train - sarimax_model.fittedvalues
 
-        axes[0].plot(self.daily_counts[-90:], label='Observed', color='black')
-        forecast_mean.plot(ax=axes[0], label='Forecast', color='red')
-        axes[0].fill_between(pred_ci.index, pred_ci.iloc[:, 0], pred_ci.iloc[:, 1], color='pink', alpha=0.3)
-        axes[0].set_title('SARIMAX Forecast – Last 30 Days')
-        axes[0].set_ylabel('Ride Count')
-        axes[0].legend()
+    exog = ts_data[['temp', 'humidity', 'windspeed', 'weather', 'season']].resample('D').mean().fillna(method='ffill')
+    gb = GradientBoostingRegressor(n_estimators=100, random_state=42)
+    gb.fit(exog.loc[residuals.index], residuals)
 
-        axes[1].plot(differenced[-90:], color='purple', label='1st Order Differenced')
-        axes[1].axhline(0, linestyle='--', color='gray', linewidth=1)
-        axes[1].set_title('Differenced Series – Stationarity Check')
-        axes[1].set_ylabel('Δ Ride Count')
-        axes[1].legend()
+    sarimax_forecast = sarimax_model.get_forecast(steps=30).predicted_mean
+    residual_preds = gb.predict(exog.loc[test.index])
+    final_forecast = sarimax_forecast + residual_preds
 
-        axes[2].plot(mse_loss.index, mse_loss.values, color='orange', marker='o', label='Squared Error (MSE)')
-        axes[2].set_title('Forecast Error – Squared Loss (MSE)')
-        axes[2].set_ylabel('MSE')
-        axes[2].set_xlabel('Date')
-        axes[2].legend()
+    plt.figure(figsize=(12, 5))
+    plt.plot(test.index, test, label='Actual')
+    plt.plot(test.index, sarimax_forecast, label='SARIMAX', linestyle='--')
+    plt.plot(test.index, final_forecast, label='Hybrid', color='green')
+    plt.legend()
+    plt.title('Hybrid Forecast')
+    plt.show()
 
-        plt.tight_layout()
-        plt.show()
-
-        plt.figure(figsize=(12, 6))
-        plt.plot(residuals)
-        plt.title('Residuals of the SARIMAX Model')
-        plt.show()
-
-        plot_acf(residuals, lags=30)
-        plt.title('ACF of Residuals')
-        plt.show()
-
-        plot_pacf(residuals, lags=30)
-        plt.title('PACF of Residuals')
-        plt.show()
-
-    def run(self):
-        self.preprocess_data()
-        self.plot_cycles()
-        self.perform_stationarity_check()
-        self.split_data()
-        self.fit_sarimax_model()
-        self.forecast_and_plot()
-
-
-
-data = pd.read_csv('../data/ola_updated.csv')
-
-
-tsa = TimeSeriesAnalysis(data)
-
-
-tsa.run()
+    print(f"Hybrid MSE: {mean_squared_error(test, final_forecast):.2f}")
+    print(f"SARIMAX MSE: {mean_squared_error(test, sarimax_forecast):.2f}")

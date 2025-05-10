@@ -2,9 +2,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from statsmodels.tsa.statespace.sarimax import SARIMAX
-from statsmodels.tsa.stattools import adfuller
-from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.tsa.statespace.sarimax import SARIMAX # type: ignore
+from statsmodels.tsa.stattools import adfuller # type: ignore
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf # type: ignore
 
 import warnings
 warnings.filterwarnings("ignore")

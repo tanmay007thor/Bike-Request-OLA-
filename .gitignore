@@ -1,0 +1,53 @@
+# Byte-compiled files
+*.pyc
+*.pyo
+__pycache__/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# IDE files (e.g., VS Code, PyCharm)
+.vscode/
+.idea/
+
+# Mac system files
+.DS_Store
+
+# Python distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Logs and temporary files
+*.log
+*.swp
+*.bak
+
+# .pytest_cache (for pytest)
+.pytest_cache/
+
+# Coverage directory for coverage.py
+.coverage
+.coverage.*
+
+# MyPy cache
+.mypy_cache/
+
+# Pycharm specific
+.idea/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Pylint
+pylint-report.txt
+pylint-output.txt
+
+# Sphinx documentation
+docs/_build/

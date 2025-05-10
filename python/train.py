@@ -30,13 +30,4 @@ def train_lstm_model(ts_data, look_back):
     y_train_actual = scaler.inverse_transform(y_train.reshape(-1, 1))
     y_test_actual = scaler.inverse_transform(y_test.reshape(-1, 1))
 
-    plt.figure(figsize=(12, 6))
-    plt.plot(y_train_actual, label='Actual Train')
-    plt.plot(train_pred, label='Predicted Train')
-    plt.plot(range(train_size, train_size + len(test_pred)), y_test_actual, label='Actual Test')
-    plt.plot(range(train_size, train_size + len(test_pred)), test_pred, label='Predicted Test')
-    plt.legend()
-    plt.title('LSTM Model Prediction')
-    plt.show()
-
-    return model, history, (train_pred, test_pred)
+    return model, history, (train_pred, test_pred) , (y_train_actual , train_pred , train_size , test_pred, y_test_actual )

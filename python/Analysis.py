@@ -97,3 +97,16 @@ def hybrid_model_analysis(ts_data, daily_counts):
 
     print(f"Hybrid MSE: {mean_squared_error(test, final_forecast):.2f}")
     print(f"SARIMAX MSE: {mean_squared_error(test, sarimax_forecast):.2f}")
+
+def plot_lstm_predictions(model, history, predictions, actual_values):
+    train_pred, test_pred = predictions
+    y_train_actual, y_test_actual, train_size, test_pred, y_test_actual = actual_values
+    plt.figure(figsize=(12, 6))
+    plt.plot(y_train_actual, label='Actual Train')
+    plt.plot(train_pred, label='Predicted Train')
+    plt.plot(range(train_size, train_size + len(test_pred)), y_test_actual, label='Actual Test')
+    plt.plot(range(train_size, train_size + len(test_pred)), test_pred, label='Predicted Test')
+    plt.legend()
+    plt.title('LSTM Model Prediction')
+    plt.show()
+

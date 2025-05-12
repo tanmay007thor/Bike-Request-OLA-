@@ -4,10 +4,10 @@ from model import build_lstm_model
 from train import train_lstm_model
 
 
-data, ts_data, daily_counts = load_and_process_data()
+data, ts_data, daily_counts , features = load_and_process_data()
 visualize_time_series(ts_data)
 plot_acf_pacf(daily_counts)
 sarimax_analysis(ts_data, daily_counts)
 hybrid_model_analysis(ts_data, daily_counts)
-model, history, predictions , actual_values = train_lstm_model(ts_data, look_back=30)
+model, history, predictions , actual_values = train_lstm_model(ts_data, features , look_back=30)
 plot_lstm_predictions(model, history, predictions, actual_values)

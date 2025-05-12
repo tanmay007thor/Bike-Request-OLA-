@@ -101,6 +101,8 @@ def hybrid_model_analysis(ts_data, daily_counts):
 def plot_lstm_predictions(model, history, predictions, actual_values):
     train_pred, test_pred = predictions
     y_train_actual, y_test_actual, train_size, test_pred, y_test_actual = actual_values
+
+
     plt.figure(figsize=(12, 6))
     plt.plot(y_train_actual, label='Actual Train')
     plt.plot(train_pred, label='Predicted Train')
@@ -109,4 +111,16 @@ def plot_lstm_predictions(model, history, predictions, actual_values):
     plt.legend()
     plt.title('LSTM Model Prediction')
     plt.show()
+
+
+    plt.figure(figsize=(10, 4))
+    plt.plot(history.history['loss'], label='Training Loss')
+    if 'val_loss' in history.history:
+        plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.title('Loss During Training')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.show()
+
 

@@ -29,7 +29,7 @@ def train_lstm_model(ts_data, features, look_back):
     y_train, y_test = y[:train_size], y[train_size:]
 
     model = build_lstm_model(look_back, X.shape[2])  
-    history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test), verbose=1)
+    history = model.fit(X_train, y_train, epochs=70, batch_size=32, validation_data=(X_test, y_test), verbose=1)
     model.save('saved_lstm_model.h5') 
     train_pred = scaler_y.inverse_transform(model.predict(X_train))
     test_pred = scaler_y.inverse_transform(model.predict(X_test))
